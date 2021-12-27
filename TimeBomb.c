@@ -1,13 +1,15 @@
-#include<reg51.h>
+#include<reg52.h>
 #include<string.h>
 #include<stdio.h>
 #include"myPrint.h"
 #include"myBuzzer.h"
+typedef unsigned int u16;
+typedef unsigned char u8;
 
-unsigned long explodeTime = 15, defuseTime = 4, plantTime = 4;
-unsigned long cnt1ms = 0;               // 以上计时值可更改
+unsigned long explodeTime = 45, defuseTime = 8, plantTime = 8;
+unsigned long cnt1ms = 0;
 
-sbit button = P2^7;
+sbit button = P3^1;
 sbit buzzer = P2^5;
 
 void Timer1Int_1ms(void) interrupt 3 {
@@ -17,7 +19,7 @@ void Timer1Int_1ms(void) interrupt 3 {
 	++ cnt1ms;
 }
 
-void delayms(unsigned long time) {      // 典型计时方式
+void delayms(unsigned long time) {
 	unsigned long t1 = cnt1ms + time;
 	while (cnt1ms < t1);
 }
@@ -33,15 +35,15 @@ void playSong(void) {
 }
 */
 
-void exploded() {               // 炸弹爆炸
+void exploded() {
 	int i;
-	strcpy(printStr, "    boom");   // 显示文字
+	strcpy(printStr, "    boom");
 	print();
-	for (i=670; i>=20; i-=10) {     // 爆炸音效
+	for (i=670; i>=20; i-=10) {
 		beep(i, 54-0.08*i);
 	}
 	while (1) {
-		if (cnt1ms % 2000 < 1000) { // 文字闪烁
+		if (cnt1ms % 2000 < 1000) {
 			strcpy(printStr, "    boom");
 		} else {
 			strcpy(printStr, "        ");
@@ -50,15 +52,15 @@ void exploded() {               // 炸弹爆炸
 	}
 }
 
-void defused(void) {            // 拆弹成功
+void defused(void) {
 	int i;
 	strcpy(printStr, "congrats");
 	print();
-	for (i=3; i>=1; --i) {      // 拆弹成功音效
+	for (i=3; i>=1; --i) {
 		beep(-i, 100);
 	}
 	while (1) {
-		if (cnt1ms % 2000 < 1000) { // 文字闪烁
+		if (cnt1ms % 2000 < 1000) {
 			strcpy(printStr, "congrats");
 		} else {
 			strcpy(printStr, "        ");
@@ -67,15 +69,15 @@ void defused(void) {            // 拆弹成功
 	}
 }
 
-void defusing(unsigned long bombEndTime) {      // 拆弹过程，参数为炸弹爆炸时间
+void defusing(unsigned long bombEndTime) {
 	unsigned long startTime = cnt1ms, endTime = cnt1ms + 1000 * defuseTime;
 	memset(printStr, 0, sizeof printStr);
 	
 	while (cnt1ms < endTime) {
 		printStr[(cnt1ms - startTime) / 125 / defuseTime] = '-';
-		print();                                // 拆弹进度条
+		print();
 		
-		setFreq(-12);
+		setFreq(-10);
 		if ((cnt1ms - startTime) % 500 < 100) {
 			TR0 = 1;
 		} else {
@@ -89,7 +91,7 @@ void defusing(unsigned long bombEndTime) {      // 拆弹过程，参数为炸�
 				return ;
 			}
 		}
-		if (cnt1ms >= bombEndTime) {        // 拆弹过程中炸弹爆炸
+		if (cnt1ms >= bombEndTime) {
 			TR0 = 0;
 			exploded();
 		}
@@ -98,25 +100,42 @@ void defusing(unsigned long bombEndTime) {      // 拆弹过程，参数为炸�
 	defused();
 }
 
-void planted(void) {        // 计时待爆
-	unsigned long startTime = cnt1ms, endTime = cnt1ms + 1000 * explodeTime;
+void planted(void) {
+	unsigned long startTime = cnt1ms, endTime = cnt1ms + 1000 * explodeTime, preBombTime1 = explodeTime/3 , preBombTime2 = preBombTime1*2;
 	char flg = 0;
 	int i;
-	for (i=1; i<=3; ++i) {  // 安放成功音效
+	for (i=1; i<=3; ++i) {
 		beep(-i, 100);
 	}
 	while (cnt1ms < endTime) {
 		sprintf(printStr, "%8ld", (endTime - cnt1ms)/1000+1);
-		print();                                    // 显示倒计时
-		
-		if ((cnt1ms - startTime) % 1000 < 200) {    // 计时音效
-			buzzer = 1;
+		print();
+
+		if(((endTime - cnt1ms)/1000+1) > preBombTime2) {
+			setFreq(-10);
+			if ((cnt1ms - startTime) % 1000 < 200) {
+				buzzer = 1;
+			} else {
+				buzzer = 0;
+			}
+		} else if (((endTime - cnt1ms)/1000+1) > preBombTime1) {
+			setFreq(-10);
+			if ((cnt1ms - startTime) % 500 < 100) {
+				TR0 = 1;
+			} else {
+				TR0 = 0;
+			}
 		} else {
-			buzzer = 0;
+			setFreq(-12);
+			if ((cnt1ms - startTime) % 100 < 40) {
+				TR0 = 1;
+			} else {
+				TR0 = 0;
+			}
 		}
 			
 		if (button == 0) {
-			if (flg) {			    // 隔离安放炸弹与拆弹的按键操作
+			if (flg) {												
 				delayms(50);
 				buzzer = 0;
 				defusing(endTime);
@@ -129,52 +148,52 @@ void planted(void) {        // 计时待爆
 	exploded();
 }
 
-void planting(void) {       // 安放过程
+void planting(void) {
 	xdata char password[] = "7355608_";
-	unsigned long startTime = cnt1ms, endTime = cnt1ms + 1000 * plantTime;  // 设置计时终点
+	unsigned long startTime = cnt1ms, endTime = cnt1ms + 1000 * plantTime;
 	memset(printStr, 0, sizeof printStr);
-	while (cnt1ms < endTime) {  // 典型的计时方法
+	while (cnt1ms < endTime) {
 		printStr[(cnt1ms - startTime) / 125 / plantTime] = password[(cnt1ms - startTime) / 125 / plantTime];
 		printStr[(cnt1ms - startTime) / 125 / plantTime + 1] = '_';
 		
-		setFreq(-12);                               // 设置音调为 G5
-		if ((cnt1ms - startTime) % 500 < 100) {     // 计时的同时播放音效
+		setFreq(-10);
+		if ((cnt1ms - startTime) % 500 < 100) {
 			TR0 = 1;
 		} else {
 			TR0 = 0;
 		}
 		
 		print();
-		if (button == 1) {      // 按钮松开，中止安放炸弹
+		if (button == 1) {
 			delayms(50);
 			if (button == 1) {
-				TR0 = 0;        // 切换到其他下一状态前关闭音效
+				TR0 = 0;
 				return ;
 			}
 		}
 	}
 	TR0 = 0;
-	planted();      // 计时结束，炸弹已安放
+	planted();
 }
 
-void standby(void) {        // 待机状态
+void standby(void) {
 	while (1) {
 		strcpy(printStr, " standby");
-		print();            // 显示文字
-		if (button == 0) {  // 按下按钮，开始安放炸弹
-			delayms(50);    // 防抖动
-			planting();     // 状态切换
+		print();
+		if (button == 0) {
+			delayms(50);
+			planting();
 		}
 	}
 }
 
-void main(void) {   // 主函数
-	TMOD = 0x10;    // 初始化计时器 1
+void main(void) {
+    TMOD = 0x10; 
 	EA = ET1 = 1;
 	TH1 = 0xFC;
 	TL1 = 0x18;
 	TR1 = 1;
-	button = 1;     // 向半双工端口输出 1
-	beep(0, 0);     // 初始化蜂鸣器
-	standby();      // 进入待机模式
+	button = 1;
+	beep(0, 0);
+	standby();
 }

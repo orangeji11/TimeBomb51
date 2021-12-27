@@ -41,7 +41,7 @@ void delay_10us(u16 ten_us)
 }
 
 void print(void) {
-	char i, j;
+	char i;
 	for (i=7; i>=0; --i) {
 		switch(i)
 		{

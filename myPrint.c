@@ -1,10 +1,16 @@
-#include<reg51.h>
+#include<reg52.h>
 #include"myPrint.h"
 
-xdata unsigned char numTable[] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F};
-char printStr[10] = "";         // 输出缓冲区            // 上方为数字 0~9 对应的段码
+typedef unsigned int u16;
+typedef unsigned char u8;
 
-unsigned char dict(char x) {    // 将字符翻译为对应段码
+sbit LSA=P2^2;
+sbit LSB=P2^3;
+sbit LSC=P2^4;
+xdata unsigned char numTable[] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F};
+char printStr[10] = "";
+
+unsigned char dict(char x) {
 	if (x >= '0' && x <= '9') {
 		return numTable[x - '0'];
 	} else if (x >= 'A' && x <= 'Z') {
@@ -29,15 +35,28 @@ unsigned char dict(char x) {    // 将字符翻译为对应段码
 	}
 }
 
-void print(void) {      // 将缓冲区的字符动态输出到数码管
-	unsigned char dgt = 0x80;   // 从左到右输出
+void delay_10us(u16 ten_us)
+{
+	while(ten_us--);	
+}
+
+void print(void) {
 	char i, j;
 	for (i=7; i>=0; --i) {
-		P0 = 0xFF;              // 禁用位码，防止鬼影
-		P1 = dict(printStr[i]); // 设置段码
-		P0 = ~dgt;              // 设置位码
-		for (j=0; j<20; ++j) ;  // 软件延迟，防止闪烁
-		dgt >>= 1;
+		switch(i)
+		{
+			case 0: LSC=1;LSB=1;LSA=1;break;
+			case 1: LSC=1;LSB=1;LSA=0;break;
+			case 2: LSC=1;LSB=0;LSA=1;break;
+			case 3: LSC=1;LSB=0;LSA=0;break;
+			case 4: LSC=0;LSB=1;LSA=1;break;
+			case 5: LSC=0;LSB=1;LSA=0;break;
+			case 6: LSC=0;LSB=0;LSA=1;break;
+			case 7: LSC=0;LSB=0;LSA=0;break;
+		}
+		P0 = dict(printStr[i]);
+		delay_10us(100);
+		P0 = 0x00;
 	}
 }
 
